@@ -1,0 +1,232 @@
+---
+format: html
+html-math-method: mathml
+---
+
+<style>
+	@import url('https://fonts.googleapis.com/css2?family=Archivo+Black&family=Noto+Color+Emoji&family=Roboto+Condensed:ital,wght@0,400;0,500;0,600;0,700;1,500&display=swap');
+	datalist {
+  display: flex;
+  justify-content: space-between;
+  color: red;
+  width: 50%;
+}
+
+input {
+  width: 50%;
+}
+</style>
+<script src="d3.v7.js"></script>
+
+# Failure of a Critical Component
+
+Let's examine a hypothetical scenario:
+
+- We have an engineered system with a "critical component"
+	- There are several of these components in the system
+- If one component fails, the whole system does not fail
+	- If multiple fail, the whole system *does* fail
+- We don't operate the system very often
+- We have seen a single component fail several times
+	- It looks like it fails more in cold weather
+	- Material analysis suggests cold weather could cause it to fail
+
+**There is a decision to make:** 
+
+- Management would like to operate the system in January 
+	- We are in the Northern Hemisphere. 
+- We expect it will be cold, between 20°F and 40°F.
+- Should we operate the system?
+
+## Data
+
+<div id="plot0"></div>
+<script src="0_scatterplot.js" type="module"></script>
+
+## Temperature-Failure Relationship
+
+- Incidents seem to be more likely in the cold
+- We want to make a good decision
+	- We need to *quantify* how likely!
+	- Therefore: create a mathematical model
+
+**Logistic Regression** is one way to model this. It uses this relationship, called the "logistic function":
+
+$$
+p(t) = \frac{1}{1+e^{\beta \cdot t + \alpha}}
+$$
+
+- $t$ is the temperature on any given day
+- $p(t)$ is the probability of component failure as a function of the temperature $t$
+- $\beta$ and $\alpha$ are scaling factors
+
+Graphically:
+
+<div id="plot1"></div>
+<script src="1_logistic_regression.js" type="module"></script>
+
+
+
+<div id="slider0-container">
+Adjust $\beta$ <br/>   <input id="slider0" type="range" min="-2" max="2" value="1" step="0.1" list="tickmarks"/> <br/>
+<datalist id="tickmarks">
+  <option value="-2"></option>
+  <option value="0"></option>
+  <option value="2"></option>
+</datalist>
+</div>
+
+<div>
+Adjust $\alpha$ <br/>   <input id="slider1" type="range" min="-2" max="2" value="0" step="0.1" list="tickmarks1"/> <br/>
+<datalist id="tickmarks1">
+  <option value="-2"></option>
+  <option value="0"></option>
+  <option value="2"></option>
+</datalist>
+</div>
+
+--- 
+
+Now let's think about fitting our model to the data.  We can scale the logistic function so that the temperature inputs make sense for $x$, and that "Incident" is 1 and "No incident" is 0.
+
+<div id="plot2"></div>
+<script src="2_logistic_regression_data.js" type="module"></script>
+
+
+
+<div>
+Adjust $\beta$ <br/>   <input id="slider2" type="range" min=".1" max="0.5" value="0.3" step="0.005" list="tickmarks2"/> <br/>
+<datalist id="tickmarks2">
+  <option value="0.5"></option>
+  <option value="0.3"></option>
+  <option value="0.1"></option>
+</datalist>
+</div>
+
+<div>
+Adjust $\alpha$ <br/>   <input id="slider3" type="range" min="-30" max="-10" value="-20" step="0.5" list="tickmarks3"/> <br/>
+<datalist id="tickmarks3">
+  <option value="-10"></option>
+  <option value="-20"></option>
+  <option value="-30"></option>
+</datalist>
+</div>
+
+
+Here, we can graphically examine the effects of changes to parameters $\alpha$ and $\beta$ on how the curve "fits" the data. 
+
+There are many values that look good - but we can do better.
+
+We will fit the model to the data *mathematically.*
+
+## Parameter Fitness
+
+We need a way to compare two sets of parameters. One measure is to calculate the probability of getting the data if our model is correct.
+
+How do we do this?
+
+Let's make an assumption:
+
+- Each of the samples is independent of the others
+- Each of the samples has the same relationship to temperature
+	- The model applies to all of the samples in the same way
+
+With this in hand, we can calculate the probability of getting *each* sample, given our model.  Here is one example:
+
+- First, we propose a model.  Let's choose $\alpha = -20$ and $\beta = 0.3$ 
+- We have a sample where temperature was 63°F, and there was an incident.
+- We put $\alpha$, $\beta$, and temperature $t$ into the logistic model:
+
+$$
+p(t) = \frac{1}{1+e^{\beta \cdot t + \alpha}} = \frac{1}{1+e^{0.3 \cdot 63 + -20}} \approx 0.75
+$$
+
+This tells us that the model with these parameters has a 75% chance of being correct *for this one data point.*
+
+- We can perform this calculation for all of the data points
+- Multiplying them together gives us a total probability for the data, if the model is correct
+
+Since our data doesn't change (it's *data*), we can now change model parameters ($\alpha$ and $\beta$) and compare different models.
+
+## Different Models
+
+We only have 23 samples (data points). That is not very many, certainly not enough to get classical statistical results from. We want to try a lot of models, not just to find the "best" model, but to learn about what models could possibly be true.
+
+Since we are using the logistic model, we are interested in possible values of $\alpha$ and $\beta$.
+
+- There is no theoretical limit to values for either.  
+	- They could each take on any real number.
+- We have some prior belief about what values are more likely.
+
+Let's propose that the values could come from *Normal distributions*, which is a good choice of distribution when we are not very certain about the underlying model.
+
+Here are some possible distributions for $\alpha$ and $\beta$:  
+
+<div id="plot3"></div>
+<script src="3_prior_distributions.js" type="module"></script>
+
+## Sampling
+
+We pick different possible values of $\alpha$ and $\beta$ - different possible models of the relationship between temperature and failure - by *sampling* from these probability distributions.
+
+- We select a value 'at random' from each distribution
+	- It is selected in proportion to the probability density
+	- For normal distributions, values closer to the mean are more probable
+
+<div id="plot4"></div>
+<script src="4_prior_sampling.js" type="module"></script>
+
+For each sample, we get a value of $\alpha$ and $\beta$.  These values give us a possible logistic curve, relating temperature and probability of failure of the component.
+
+<div>
+<input id="resample_button" type="button" value="Resample" />
+</div>
+
+
+<div id="plot5"></div>
+
+## Acceptance and Rejection
+
+We can tell visually that some of these possible distributions are good fits, and that some are not. We would like to 'keep' only good fits.
+
+We can also use the mathematical formula we introduced previously to compare any two distributions!
+
+An algorithm called the *Metropolis algorithm* lets us determine which candidates to keep:
+
+- We know the probability of our current sample, $p$
+- Each time we generate a new sample, we calculate the probability $p'$ of the data being correct, given the model.
+- If the new sample gives us a higher probability ($p' > p$), we accept it automatically.
+- If the new sample gives us a lower probability, we have a chance of accepting it:
+	- We compare the two probabilities by dividing ($q = \frac{p'}{p}$)
+	- We generate a uniform random number $u$ and compare it to $q$. 
+	- If $u < q$, we accept the new sample
+	- Otherwise, we reject it
+- We remember which samples we accept
+
+We can run the algorithm and observe the results.
+
+
+
+<div id="plot6"></div>
+<div id="plot-info"></div>
+<input id="resample_button3" type="button" value="Sample" /> <input id="resample_button4" type="button" value="Stop Sampling" /> 
+<div id="plot7"></div>
+<script src="5_mcmc.js" type="module"></script>
+
+## Interpreting Results
+
+We end up with a probability distribution over possible models.
+
+- We can calculate probability of component failure for any given temperature
+- We can quantify the uncertainty of these results
+	- This could be a "standard" 95% confidence interval
+	- It could be an asymmetric measure
+- We can calculate probabilities of multiple components failing
+
+**We have a decision to make:**
+
+- Management would like to operate the system in January 
+	- We are in the Northern Hemisphere. 
+- We expect it will be cold, between 20°F and 40°F.
+	- We find out that it is 36°F
+- Should we operate the system?
